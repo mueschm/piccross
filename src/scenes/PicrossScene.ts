@@ -99,30 +99,10 @@ export class PicrossScene extends Phaser.Scene {
   }
 
   create() {
-    // Add layered background
-    const bgBase = this.add.rectangle(0, 0, 800, 600, 0x1a1a1a).setOrigin(0);
-    const bgPattern = this.add.tileSprite(0, 0, 800, 600, 'pattern').setOrigin(0).setAlpha(0.1);
-    
-    // Add floating paper effect
-    const gameBg = this.add.rectangle(50, 50, 700, 500, 0xffffff)
-      .setOrigin(0)
-      .setDepth(1);
-    
-    // Add drop shadow
-    const shadow = this.add.rectangle(55, 55, 700, 500, 0x000000)
-      .setOrigin(0)
-      .setAlpha(0.2)
-      .setDepth(0);
-
-    // Subtle paper movement animation
-    this.tweens.add({
-      targets: [gameBg, shadow],
-      y: '+=5',
-      duration: 2000,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut'
-    });
+    // Add paper texture background
+    this.add.rectangle(0, 0, 800, 600, this.colors.background)
+      .setOrigin(0, 0)
+      .setDepth(-1);
 
     // Calculate grid dimensions
     const gridWidth = this.solution[0].length * this.cellSize;
@@ -190,26 +170,8 @@ export class PicrossScene extends Phaser.Scene {
   }
 
   private createGrid() {
-    // Add grid container with perspective effect
-    const gridContainer = this.add.container(this.marginLeft, this.marginTop);
-    gridContainer.setDepth(2);
-    
-    // Add subtle grid animation
-    this.tweens.add({
-      targets: gridContainer,
-      scaleX: 1.001,
-      scaleY: 1.001,
-      duration: 2000,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut'
-    });
-
-    // Add grid highlight effect
-    const highlight = this.add.graphics();
-    highlight.lineStyle(2, 0xffffff, 0.1);
-    highlight.strokeRect(0, 0, gridWidth, gridHeight);
-    gridContainer.add(highlight);
+    const startX = this.marginLeft;
+    const startY = this.marginTop;
 
     // Draw imperfect grid lines first
     const graphics = this.add.graphics();
@@ -217,12 +179,12 @@ export class PicrossScene extends Phaser.Scene {
 
     // Vertical lines with slight waviness
     for (let col = 0; col <= this.solution[0].length; col++) {
-      const x = this.marginLeft + (col * this.cellSize);
+      const x = startX + (col * this.cellSize);
       graphics.beginPath();
-      graphics.moveTo(x, this.marginTop);
+      graphics.moveTo(x, startY);
       
       // Create wavy line by adding small random offsets
-      for (let y = this.marginTop; y <= this.marginTop + (this.solution.length * this.cellSize); y += 5) {
+      for (let y = startY; y <= startY + (this.solution.length * this.cellSize); y += 5) {
         const wobble = Math.random() * 2 - 1; // Random offset between -1 and 1
         graphics.lineTo(x + wobble, y);
       }
@@ -231,12 +193,12 @@ export class PicrossScene extends Phaser.Scene {
 
     // Horizontal lines with slight waviness
     for (let row = 0; row <= this.solution.length; row++) {
-      const y = this.marginTop + (row * this.cellSize);
+      const y = startY + (row * this.cellSize);
       graphics.beginPath();
-      graphics.moveTo(this.marginLeft, y);
+      graphics.moveTo(startX, y);
       
       // Create wavy line by adding small random offsets
-      for (let x = this.marginLeft; x <= this.marginLeft + (this.solution[0].length * this.cellSize); x += 5) {
+      for (let x = startX; x <= startX + (this.solution[0].length * this.cellSize); x += 5) {
         const wobble = Math.random() * 2 - 1; // Random offset between -1 and 1
         graphics.lineTo(x, y + wobble);
       }
@@ -248,8 +210,8 @@ export class PicrossScene extends Phaser.Scene {
       this.grid[row] = [];
       for (let col = 0; col < this.solution[0].length; col++) {
         const cell = this.add.rectangle(
-          this.marginLeft + col * this.cellSize,
-          this.marginTop + row * this.cellSize,
+          startX + col * this.cellSize,
+          startY + row * this.cellSize,
           this.cellSize - 2,
           this.cellSize - 2,
           this.colors.cell.default
@@ -278,25 +240,11 @@ export class PicrossScene extends Phaser.Scene {
         });
 
         cell.on('pointerover', () => {
-          if (this.cellStates[row][col] === 0) {
-            this.tweens.add({
-              targets: cell,
-              scaleX: 1.05,
-              scaleY: 1.05,
-              duration: 100,
-              ease: 'Sine.easeOut'
-            });
-            
-            // Add glow effect
-            const glow = this.add.rectangle(
-              cell.x + this.cellSize/2,
-              cell.y + this.cellSize/2,
-              this.cellSize + 4,
-              this.cellSize + 4,
-              0xffffff
-            ).setAlpha(0.2);
-            
-            cell.setData('glow', glow);
+          if (this.isPointerDown && this.currentAction !== null) {
+            // Continue the same action while dragging
+            this.updateCellState(row, col, this.currentAction);
+          } else if (this.cellStates[row][col] === 0) {
+            cell.setFillStyle(this.colors.cell.hover);
           }
         });
 
@@ -369,33 +317,6 @@ export class PicrossScene extends Phaser.Scene {
         if (c !== col) this.checkLineCompletion(c, 'column');
       }
     }
-
-    this.animateCell(cell, cell.getData('fillShape') as Phaser.GameObjects.Polygon | null, state);
-  }
-
-  private animateCell(cell: Phaser.GameObjects.Rectangle, fillShape: Phaser.GameObjects.Polygon | null, state: number) {
-    // Scale animation for cell filling
-    this.tweens.add({
-      targets: [cell, fillShape],
-      scaleX: { from: 0.8, to: 1 },
-      scaleY: { from: 0.8, to: 1 },
-      alpha: { from: 0.6, to: 1 },
-      duration: 200,
-      ease: 'Back.easeOut'
-    });
-
-    // Add particle effect
-    const particles = this.add.particles(cell.x + this.cellSize/2, cell.y + this.cellSize/2, 'sparkle', {
-      lifespan: 400,
-      speed: { min: 50, max: 100 },
-      scale: { start: 0.4, end: 0 },
-      quantity: 4,
-      alpha: { start: 0.6, end: 0 },
-      blendMode: 'ADD'
-    });
-    
-    // Clean up particles
-    this.time.delayedCall(400, () => particles.destroy());
   }
 
   private createHints() {
@@ -484,53 +405,38 @@ export class PicrossScene extends Phaser.Scene {
   }
 
   private showWinModal() {
-    // Create confetti effect
-    const confetti = this.add.particles(400, 0, 'confetti', {
-      gravityY: 300,
-      quantity: 5,
-      frequency: 50,
-      lifespan: 4000,
-      scale: { start: 1, end: 0.5 },
-      rotate: { min: 0, max: 360 },
-      speedX: { min: -150, max: 150 },
-      speedY: { min: 200, max: 400 },
-      bounds: { x: 0, y: 0, w: 800, h: 600 },
-      collideBottom: true
-    });
-
-    // Modal slide-in animation
-    const modal = this.add.container(400, -200);
+    const modalGroup = this.add.group();
     
     // Replace jagged modal with regular rectangle
-    const modalRect = this.add.rectangle(
-      0,
-      0,
+    const modal = this.add.rectangle(
+      this.cameras.main.centerX,
+      this.cameras.main.centerY,
       400,
       250,
       this.colors.background,
       0.95
     );
-    modalRect.setStrokeStyle(2, this.colors.grid);
-    modal.add(modalRect);
+    modal.setStrokeStyle(2, this.colors.grid);
+    modalGroup.add(modal);
 
     // Mark current puzzle as complete
     GameStateManager.markPuzzleComplete(GameStateManager.state.currentPuzzle);
 
     const isAllComplete = GameStateManager.state.isComplete;
     const title = this.add.text(
-      0,
-      0,
+      this.cameras.main.centerX,
+      this.cameras.main.centerY - 40,
       isAllComplete ? 'ALL PUZZLES COMPLETE!' : 'PUZZLE COMPLETE!',
       {
         ...this.FONTS.title,
         color: '#000000'
       }
     ).setOrigin(0.5);
-    modal.add(title);
+    modalGroup.add(title);
 
     const message = this.add.text(
-      0,
-      0,
+      this.cameras.main.centerX,
+      this.cameras.main.centerY + 20,
       isAllComplete ? 
         `Final Time: ${GameStateManager.getElapsedTime()}\nPress ESC for menu` :
         'Click for next puzzle\nPress ESC for menu',
@@ -540,10 +446,10 @@ export class PicrossScene extends Phaser.Scene {
         align: 'center'
       }
     ).setOrigin(0.5);
-    modal.add(message);
+    modalGroup.add(message);
 
-    modalRect.setInteractive();
-    modalRect.on('pointerdown', () => {
+    modal.setInteractive();
+    modal.on('pointerdown', () => {
       if (isAllComplete) {
         this.scene.start('MenuScene');
       } else {
@@ -554,13 +460,6 @@ export class PicrossScene extends Phaser.Scene {
 
     this.input.keyboard?.once('keydown-ESC', () => {
       this.scene.start('MenuScene');
-    });
-
-    this.tweens.add({
-      targets: modal,
-      y: 300,
-      duration: 600,
-      ease: 'Back.easeOut'
     });
   }
 
