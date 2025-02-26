@@ -4,7 +4,8 @@ module.exports = {
   entry: './src/game.ts',
   output: {
     filename: 'bundle.js',
-    path: path.resolve(__dirname, 'docs'),
+    path: path.resolve(__dirname, 'dist'),
+    publicPath: './',
   },
   module: {
     rules: [
@@ -13,6 +14,10 @@ module.exports = {
         use: 'ts-loader',
         exclude: /node_modules/,
       },
+      {
+        test: /\.(png|svg|jpg|jpeg|gif)$/i,
+        type: 'asset/resource',
+      },
     ],
   },
   resolve: {
@@ -20,11 +25,9 @@ module.exports = {
   },
   devServer: {
     static: {
-      directory: path.join(__dirname, 'dist'),
+      directory: path.join(__dirname, './'),
     },
-    hot: true,
     compress: true,
     port: 8080,
   },
-  mode: 'development',
 }; 
